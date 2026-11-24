@@ -42,4 +42,6 @@ body.full-fallback{position:fixed;inset:0;overflow-y:auto;z-index:20;background:
 .input-wrap:focus-within input{caret-color:transparent}
 .input-wrap:focus-within:not(.selecting) #block{display:block;left:calc(var(--caret-pos,0)*1ch - var(--text-offset,0px));mix-blend-mode:difference}
 .input-wrap.selecting #block{display:none}
+.volume-controls{display:inline-flex;align-items:center;gap:.6rem}.volume-controls input{width:clamp(70px,22vw,125px)}#volume-value{min-width:4ch;text-align:right}
+#audio-status{margin:6px 0 12px}.panel-actions #audio-test{text-transform:uppercase}#audio-test:disabled{opacity:.65}
 @media(max-width:445px){.keys button,.audio{min-height:38px}.keys button{font-size:.71rem}}

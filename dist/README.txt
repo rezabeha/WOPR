@@ -35,7 +35,11 @@ Echo Drift, Polar Silence and Glass Horizon present distinct pieces of evidence.
 
 ### Display, sound and accessibility
 
-The Settings panel controls typing speed, simulation speed, scanlines, glow, flicker, curvature, cursor blinking, contrast and instrument motion. The globe, carrier wave, exercise tracks and self-play boards also have individual motion switches. A first visit honors the browser’s reduced-motion preference. Closing the settings panel restores focus. The final transcript response has a polite live-region announcement. Audio starts muted. Modem tones, key clicks, beeps, radar, activity and optional speech can be toggled separately. Audio and speech availability depend on browser support and user interaction.
+The Settings panel controls typing speed, simulation speed, scanlines, glow, flicker, curvature, cursor blinking, contrast and instrument motion. The globe, carrier wave, exercise tracks and self-play boards also have individual motion switches. A first visit honors the browser’s reduced-motion preference. Closing the settings panel restores focus. The final transcript response has a polite live-region announcement.
+
+Audio starts muted. At `LOGON:`, click **SOUND OFF** to hear the modem handshake, even if the connection has already completed. `RECONNECT` plays it again while sound is enabled. After a refresh, **RESUME SOUND** indicates a saved preference waiting for your first click or keystroke.
+
+Type `TEST SOUND` at any prompt, or open **F2 Settings → Test sound**, to play two notes and measure the signal going to the browser. The output volume slider controls the effects and Joshua’s voice. Modem, keyboard, terminal, radar and activity sounds each have a switch. Enabling Joshua’s voice in Settings previews the browser’s speech synthesizer. If the test reports a signal but you hear silence, check the tab’s mute setting and the selected speaker or headphones.
 
 ## Source layout
 
@@ -50,6 +54,7 @@ The Settings panel controls typing speed, simulation speed, scanlines, glow, fli
 | `dist/js/visuals.js`, `audio.js`, `dist/assets/` | Projected vector globe, synthetic tracks, carrier signal, audio and local assets |
 | `tests/` | Regression tests runnable with Node’s built-in test runner |
 | `scripts/source-archive.py` | Rebuild the downloadable source ZIP and plain-text README |
+| `scripts/standalone.py` | Build the offline HTML edition with its embedded source archive |
 
 ## Run, test and deploy
 
@@ -65,6 +70,8 @@ With Node.js 20 or newer, run the regression suite. No package installation or A
 node --test tests/*.test.js
 python3 scripts/source-archive.py
 ```
+
+Run `python3 scripts/standalone.py` to rebuild `WOPR-Terminal.html` alongside this README. Open that single file in a modern browser to run the same terminal and sound controls offline.
 
 For ChatGPT Sites, register the Site, select `dist` as the static directory in `.openai/hosting.json`, push the matching source state, save the packaged version, and publish it with public access. The ZIP omits the original hosting identity so another operator can register their own Site. Any static HTTP host can serve the same `dist` directory. All application resources ship together.
 

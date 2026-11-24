@@ -7,7 +7,7 @@ dist = root / "dist"
 output = dist / "wopr-source.zip"
 (dist / "README.txt").write_bytes((root / "README.md").read_bytes())
 
-files = [root / "README.md", root / "package.json", Path(__file__).resolve()]
+files = [root / "README.md", root / "package.json", Path(__file__).resolve(), root / "scripts/standalone.py"]
 files.extend(sorted((root / "tests").glob("*.test.js")))
 files.extend(path for path in sorted(dist.rglob("*"))
              if path.is_file() and path != output and not path.name.startswith("qa-"))

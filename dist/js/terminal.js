@@ -168,6 +168,7 @@ export function issue(s,raw){
   if(/^(HELP|MAN|COMMANDS|F1|\?)$/.test(key)||raw.trim()==='?')return reply([],{ui:'help'});
   if(/^(SETTINGS|PREFERENCES|CONFIG|SETUP|F2)$/.test(key))return reply([],{ui:'settings'});
   if(/^(FULLSCREEN|FULL SCREEN|F4)$/.test(key))return reply([],{ui:'fullscreen'});
+  if(/^(?:TEST (?:SOUND|AUDIO)|(?:SOUND|AUDIO) TEST)$/.test(key))return reply([],{ui:'audioTest'});
   if(/^(SOUND|AUDIO)( ON| OFF)?$/.test(key))return reply([],{ui:'audio',value:key.endsWith(' ON')?true:key.endsWith(' OFF')?false:null});
   if(/^(RECONNECT|REDIAL|DIAL|ATDT|F3|CONNECT)$/.test(key)){s.linked=true;s.auth=false;s.module=null;s.menu=false;return reply([],{reboot:true});}
   if(/^(LOGOFF|LOGOUT|HANG UP|DISCONNECT|ATH)$/.test(key)){s.linked=false;s.auth=false;s.module=null;s.menu=false;return answer('NO CARRIER.','TYPE RECONNECT TO DIAL AGAIN.');}

@@ -75,7 +75,7 @@ export function renderGame(s,picked){
 }
 const helpRows=rows=>'<dl class="help-list">'+rows.map(([a,b])=>'<div class="help-row"><dt>'+esc(a)+'</dt><dd>'+esc(b)+'</dd></div>').join('')+'</dl>';
 export function helpContent(s){
-  const common=[['HELP / F1','Operator reference'],['SETTINGS / F2','Display and audio'],['RECONNECT / F3','Dial the remote line'],['FULLSCREEN / F4','Expand the terminal']];
+  const common=[['HELP / F1','Operator reference'],['SETTINGS / F2','Display and audio'],['TEST SOUND','Play two notes and check the output level'],['RECONNECT / F3','Dial the remote line'],['FULLSCREEN / F4','Expand the terminal']];
   let rows;
   if(!s.auth)rows=[['LOGON','Type an account name'],['HINT','Request an archive clue'],['LOGOFF','Hang up the line']];
   else rows=({chess:[['e4 / e2e4 / P-K4','Move a piece'],['PAWN TO KING FOUR','Descriptive language'],['LEVEL CADET / OPERATOR / EXPERT','Set search difficulty'],['BOARD / ASCII / GRAPHIC','Display the position'],['HINT / UNDO / HISTORY','Analyze or review'],['RESIGN / CLAIM DRAW','End the game'],['NEW GAME / EXIT','Restart or leave']],
@@ -92,5 +92,9 @@ export function settingsContent(p){
   return '<h3>DISPLAY</h3>'+select('speed','Typing speed',[['SLOW','Slow'],['NORMAL','Normal'],['FAST','Fast'],['INSTANT','Instant']])+select('animation','Simulation speed',[['0.5','0.5×'],['1','1×'],['2','2×'],['4','4×']])+
     [['scanlines','Scanlines'],['glow','Phosphor glow'],['flicker','CRT flicker'],['curvature','Screen curvature'],['cursor','Blinking cursor'],['contrast','High contrast']].map(x=>check(...x)).join('')+
     '<h3>MOTION</h3>'+[['motion','Enable instrument motion'],['globeMotion','Rotate globe and relay'],['waveMotion','Animate carrier wave'],['trackMotion','Animate radar and tracks'],['boardMotion','Animate self-play boards']].map(x=>check(...x)).join('')+
-    '<h3>AUDIO</h3>'+[['sound','Enable sound'],['modem','Modem handshake'],['keys','Keyboard clicks'],['beeps','Terminal beeps'],['radar','Radar alerts'],['activity','Computer activity'],['voice','Joshua speech']].map(x=>check(...x)).join('')+'<p class="panel-note">Settings are stored on this device. Speech uses voices available in your browser.</p>';
+    '<h3>AUDIO</h3>'+check('sound','Enable sound')+
+    '<label class="setting-row" for="volume-control"><span>Output volume</span><span class="volume-controls"><input id="volume-control" data-pref="volume" type="range" min="0" max="100" step="5" value="'+esc(p.volume)+'"><span id="volume-value" aria-hidden="true">'+esc(p.volume)+'%</span></span></label>'+
+    '<div class="panel-actions"><button type="button" id="audio-test">Test sound</button></div><p class="panel-note" id="audio-status" role="status"></p>'+
+    [['modem','Modem handshake'],['keys','Keyboard clicks'],['beeps','Terminal beeps'],['radar','Radar alerts'],['activity','Computer activity'],['voice','Joshua speech']].map(x=>check(...x)).join('')+
+    '<p class="panel-note">Joshua speech uses a voice installed in your browser.</p>';
 }

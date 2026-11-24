@@ -1,5 +1,5 @@
 import {freshSession,issue,advance,tick,computerMove} from './terminal.js';
-import {defaults,enableAudio,muteAudio,sound,say} from './audio.js';
+import {defaults,audioState,enableAudio,muteAudio,setVolume,volumePercent,sound,say,testOutput} from './audio.js';
 import {renderGame,helpContent,settingsContent,formatTimer,paintTrial} from './views.js';
 import {restoreChess} from './chess.js';
 import {TRIAL_SIZE} from './tictac.js';
@@ -22,9 +22,11 @@ function readSession(){
 const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 const savedPrefs=read('localStorage',prefsKey)||{};
 const prefs={...defaults,...(reduced?{motion:false,flicker:false,cursor:false,speed:'INSTANT'}:{}),...savedPrefs};
+prefs.volume=volumePercent(prefs.volume);
 const restored=readSession(),s=restored||freshSession();
 let booting=false,bootDone=null,bootTimers=[],historyIndex=s.recall.length,workingText='',picked=null;
 let queue=[],typingFrame=0,lastChar=0,remainder=0,worker=null,jobId=0,pendingKey='',timerAccum=0;
+let soundRequest=0, testingSound=false, audioMessage='', restoreFailed=false;
 const save=()=>write('sessionStorage',sessionKey,s);
 function focusEntry(force=false){if(!panel.open && (force||window.matchMedia('(pointer:fine)').matches))input.focus({preventScroll:true});}
 function followLog(){log.scrollTop=log.scrollHeight;}
@@ -91,20 +93,75 @@ function render(){
   if(cmd){const target=[...area.querySelectorAll('[data-command]')].find(b=>b.dataset.command===cmd);target?.focus({preventScroll:true});}
   updatePrompt();
 }
+function refreshSoundControls(){
+  const state=audioState(),running=prefs.sound&&state==='running';
+  const label=!prefs.sound?'SOUND OFF':running?'SOUND ON':state==='starting'?'STARTING SOUND':'RESUME SOUND';
+  $('audio-label').textContent=label;
+  $('audio-icon').setAttribute('href','#i-'+(running?'sound':'mute'));
+  $('audio-button').setAttribute('aria-pressed',String(running));
+  $('audio-button').title=running?'Mute sound':'Enable terminal sound';
+  const checkbox=panel.querySelector('[data-pref="sound"]');
+  if(checkbox)checkbox.checked=prefs.sound;
+  if($('audio-test'))$('audio-test').disabled=testingSound;
+  if($('volume-value'))$('volume-value').textContent=prefs.volume+'%';
+  const status=$('audio-status');
+  if(status){
+    const text=audioMessage||(running?'Audio output is ready.':prefs.sound?'Tap Test sound to start audio.':'Test sound enables audio and plays two notes.');
+    if(status.textContent!==text)status.textContent=text;
+  }
+}
 function applyPrefs(){
   for(const k of ['scanlines','glow','flicker','curvature','contrast'])document.body.classList.toggle(k,!!prefs[k]);
   document.body.classList.toggle('cursor-blink',!!prefs.cursor);
-  $('audio-label').textContent='SOUND '+(prefs.sound?'ON':'OFF');
-  $('audio-icon').setAttribute('href','#i-'+(prefs.sound?'sound':'mute'));
-  $('audio-button').setAttribute('aria-pressed',String(prefs.sound));
+  refreshSoundControls();
   write('localStorage',prefsKey,prefs);
   if(prefs.speed==='INSTANT')flush();
 }
-function changeSound(value){
-  prefs.sound=value==null?!prefs.sound:value;
-  if(prefs.sound){if(!enableAudio()){prefs.sound=false;addLines(['AUDIO DEVICE UNAVAILABLE IN THIS BROWSER.']);}else sound(prefs,'beeps');}
-  else muteAudio();
-  applyPrefs();
+function reportSound(message){
+  audioMessage=message;
+  if(!panel.open)addLines([message.toUpperCase()]);
+  refreshSoundControls();
+}
+async function changeSound(value,action='enable'){
+  if(action==='test'&&testingSound)return;
+  const active=['running','starting'].includes(audioState());
+  const enable=value??!(prefs.sound&&active);
+  const request=++soundRequest;
+  prefs.sound=enable;testingSound=enable&&action==='test';audioMessage='';restoreFailed=false;
+  if(!enable){muteAudio();applyPrefs();return;}
+  try{
+    // Start inside the actual click or key event, before yielding.
+    const ready=enableAudio(refreshSoundControls,prefs.volume);
+    applyPrefs();await ready;
+    if(request!==soundRequest || !prefs.sound)return;
+    if(action==='test'){
+      if(prefs.volume===0){reportSound('Output volume is 0%. Raise it to hear the test.');return;}
+      audioMessage='Playing two test notes…';refreshSoundControls();
+      const peak=await testOutput(prefs);
+      if(request!==soundRequest)return;
+      if(peak===null)reportSound('Audio was interrupted. Tap Test sound to retry.');
+      else if(peak>.0001)reportSound('Output signal detected ('+Math.round(20*Math.log10(peak))+' dBFS).');
+      else reportSound('No output signal detected. Check terminal volume and retry.');
+    }else if(action==='voice'){
+      const failed=()=>{if(request===soundRequest&&prefs.voice)reportSound('Speech is unavailable. Check the voices installed in this browser.');};
+      if(!say(prefs,['SPEECH SYNTHESIZER ONLINE.'],false,failed))failed();
+    }else if(action==='enable'){
+      sound(prefs,!s.auth&&s.linked&&prefs.modem?'modem':'beeps');
+    }
+  }catch{
+    if(request===soundRequest){
+      muteAudio();restoreFailed=true;
+      reportSound('Audio could not start. Allow sound for this tab, then tap Resume sound or Test sound.');
+    }
+  }finally{
+    if(request===soundRequest){testingSound=false;refreshSoundControls();}
+  }
+}
+function restoreAudioOnGesture(event){
+  if(!prefs.sound||restoreFailed||!event.isTrusted||['running','starting'].includes(audioState()))return;
+  if(event.target.closest?.('#audio-button,#audio-test,[data-pref="sound"],[data-pref="voice"]'))return;
+  if(event.target===input && event.key==='Enter' && /^(?:(?:sound|audio)(?: (?:on|off|test))?|test (?:sound|audio))$/i.test(input.value.trim()))return;
+  changeSound(true,'restore');
 }
 function clearLog(){
   flush();s.log=[];log.replaceChildren();
@@ -130,7 +187,8 @@ function closePanel(){if(panel.open)panel.close();}
 function openPanel(which){
   const source=which==='source';$('panel-title').textContent=source?'SOURCE ARCHIVE':which==='help'?'TERMINAL HELP':'STATION SETTINGS';
   $('panel-body').innerHTML=source?'<p>Download the terminal, game engines, tests and operator README.</p><div class="panel-actions"><a href="./wopr-source.zip" download>DOWNLOAD SOURCE ZIP</a><a href="./README.txt" target="_blank" rel="noopener">READ DOCUMENTATION</a></div>':which==='help'?helpContent(s):settingsContent(prefs);
-  if(!panel.open)panel.showModal();panel.scrollTop=0;$('close-panel').focus();
+  if(!panel.open)panel.showModal();if(which==='settings')refreshSoundControls();
+  panel.scrollTop=0;$('close-panel').focus();
 }
 async function fullscreen(){
   try{
@@ -174,7 +232,6 @@ function resumeOpponent(){
 function submit(raw,{shortcut=false}={}){
   const clean=String(raw||'').trim();
   if(!clean){if(booting)finishBoot();flush();return;}
-  if(prefs.sound)enableAudio();
   if(booting && !['SOUND','SETTINGS','HELP','FULLSCREEN'].includes(clean.toUpperCase()))finishBoot();
   flush();
   if(!shortcut){
@@ -191,6 +248,7 @@ function submit(raw,{shortcut=false}={}){
     if(r.ui==='help'||r.ui==='settings'||r.ui==='source'){openPanel(r.ui);}
     else if(r.ui==='fullscreen'){fullscreen();}
     else if(r.ui==='audio'){changeSound(r.value);}
+    else if(r.ui==='audioTest'){changeSound(true,'test');}
     if(r.lines.length){
       const finalReport=s.module==='war'&&s.games.war.phase==='conclusion'&&r.lines.includes(conclusion[0]);
       addLines(finalReport?r.lines.slice(0,1):r.lines,'',s.auth && (r.voice || s.module!=='chess'));
@@ -205,7 +263,8 @@ function submit(raw,{shortcut=false}={}){
   }
 }
 $('command-form').addEventListener('submit',e=>{e.preventDefault();submit(input.value);});
-input.addEventListener('input',()=>{caret();sound(prefs,'keys');});
+for(const event of ['pointerup','click','keydown'])document.addEventListener(event,restoreAudioOnGesture,true);
+input.addEventListener('input',e=>{restoreAudioOnGesture(e);caret();sound(prefs,'keys');});
 for(const event of ['keyup','click','scroll','select','focus'])input.addEventListener(event,caret);
 document.addEventListener('selectionchange',()=>{if(document.activeElement===input)caret();});
 input.addEventListener('keydown',e=>{
@@ -237,11 +296,22 @@ document.addEventListener('click',e=>{
 });
 $('close-panel').addEventListener('click',closePanel);
 panel.addEventListener('close',()=>focusEntry());
+panel.addEventListener('click',e=>{if(e.target.closest('#audio-test'))changeSound(true,'test');});
 panel.addEventListener('click',e=>{if(e.target===panel){const r=panel.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)closePanel();}});
+panel.addEventListener('input',e=>{
+  if(e.target.dataset.pref!=='volume')return;
+  prefs.volume=volumePercent(e.target.value);setVolume(prefs.volume);audioMessage='';refreshSoundControls();
+});
 panel.addEventListener('change',e=>{
   const key=e.target.dataset.pref;if(!(key in defaults))return;
-  if(key==='sound'){changeSound(e.target.checked);e.target.checked=prefs.sound;}
-  else{prefs[key]=e.target.type==='checkbox'?e.target.checked:key==='animation'?Number(e.target.value):e.target.value;applyPrefs();if(key==='voice'&&!prefs.voice)window.speechSynthesis?.cancel();}
+  if(key==='sound'){changeSound(e.target.checked);return;}
+  if(key==='volume'){prefs.volume=volumePercent(e.target.value);setVolume(prefs.volume);}
+  else prefs[key]=e.target.type==='checkbox'?e.target.checked:key==='animation'?Number(e.target.value):e.target.value;
+  applyPrefs();
+  if(key==='voice'){
+    if(prefs.voice)changeSound(true,'voice');
+    else window.speechSynthesis?.cancel();
+  }
 });
 let lastSim=performance.now(),endingTime=0;
 setInterval(()=>{
